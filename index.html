@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#080b0f">
+<title>Code-Cracker</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="title-row">
+    <div>
+      <div class="subtitle">Simon Shuker-style Code Cracker plagiarized by James Mee </div>
+      <h1>C**t-Cracker</h1>
+    </div>
+    <div class="puzzle-number"></div>
+  </div>
+  <p>Each number represents a different letter of the alphabet. Select a number in the grid then enter your letter suggestion in the Enter letter section below the puzzle. The Solve button is for soft c***s and the New Puzzle button creates a new f***en puzzle.</p>
+</header>
+
+<main>
+  <div class="toolbar">
+    <div>
+      <strong id="status">Preparing puzzle…</strong>
+      <span id="stats"></span>
+    </div>
+    <div class="buttons">
+      <button id="newPuzzle" class="primary">New Puzzle</button>
+      <button id="solvePuzzle">Solve</button>
+    </div>
+  </div>
+
+  <section class="puzzle-panel">
+    <div class="puzzle-and-control">
+      <div class="main-area">
+        <div id="grid" class="grid" aria-label="13 by 13 puzzle grid"></div>
+        <div class="alphabet" id="alphabet"></div>
+      </div>
+
+      <aside class="control-area">
+        <div class="control-title">CODE</div>
+        <div id="controlGrid" class="control-grid"></div>
+      </aside>
+    </div>
+
+    <div class="below-grid">
+      <div id="hints" class="hints"></div>
+      <div class="decoder">
+        <span>Enter Letter:</span> <strong id="selectedCode">—</strong>
+        <input id="letterInput" maxlength="1" inputmode="text" autocomplete="off" aria-label="Letter">
+        <button id="setLetter">Enter</button>
+        <button id="clearLetter" class="light">Clear</button>
+        <span id="decoderMsg"></span>
+      </div>
+    </div>
+  </section>
+
+  <section id="solution" class="solution hidden">
+    <h2>Solution / Word Trail</h2>
+    <div class="solution-columns">
+      <div><h3>Across</h3><div id="acrossWords" class="words"></div></div>
+      <div><h3>Down</h3><div id="downWords" class="words"></div></div>
+    </div>
+  </section>
+</main>
+
+<footer>write some shit in here</footer>
+
+<script src="words.js"></script>
+<script src="puzzles.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
