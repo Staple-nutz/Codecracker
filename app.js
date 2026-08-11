@@ -157,7 +157,5 @@ document.getElementById('clearLetter').addEventListener('click',clearLetter);
 letterInput.addEventListener('keydown',e=>{if(e.key==='Enter')setLetter()});
 document.addEventListener('keydown',e=>{if(selectedCode!=null&&/^[a-zA-Z]$/.test(e.key)){letterInput.value=e.key;setLetter()}});
 //document.getElementById('alphabet').textContent=ALPHABET.toUpperCase().split('').join('  ');
-
-
 newPuzzle();
 })();
