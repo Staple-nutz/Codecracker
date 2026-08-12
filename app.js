@@ -45,18 +45,143 @@ function cipher(){
 }
 function signature(g){return g.map(r=>r.map(x=>x||'.').join('')).join('/')}
 
-function choosePuzzle(){
-  const order=shuffle(BANK);
-  for(const b of order){
-    const sig=b.mask+'|'+b.words.join(',');
-    if(recent.has(sig))continue;
-    const {g,slots}=makeGrid(MASKS[b.mask],b.words);
-    if(validPuzzle(g))return {mask:MASKS[b.mask],words:b.words,g,slots,sig};
-  }
-  /* Recent bank exhaustion is extremely unlikely; permit reuse rather than fail. */
-  const b=order[0], x=makeGrid(MASKS[b.mask],b.words);
-  return {mask:MASKS[b.mask],words:b.words,g:x.g,slots:x.slots,sig:b.mask+'|'+b.words.join(',')};
+// v4 puzzle diversity engine -------------------------------------------------
+// The original v3 bank is retained as a set of valid Shuker-style seeds, but a
+// new puzzle is now made by mutating a seed with the cleaned English dictionary.
+// This means New Puzzle is no longer limited to the exact pre-generated fills.
+const WORD_LIST = [...WORDS].filter(w => /^[a-z]{3,13}$/.test(w));
+const WORDS_BY_LEN = new Map();
+const POS_INDEX = new Map();
+const SESSION_WORD_USE = new Map();
+const FORBIDDEN_WORDS = new Set(['azure','mexican','drubetskoy','ferapontov','pavlovna']);
+for (const w of WORD_LIST) {
+  if (!WORDS_BY_LEN.has(w.length)) WORDS_BY_LEN.set(w.length, []);
+  WORDS_BY_LEN.get(w.length).push(w);
 }
+for (const [len,list] of WORDS_BY_LEN) {
+  const positions=[];
+  for(let p=0;p<len;p++){
+    const m=new Map();
+    for(const w of list){
+      const ch=w[p];
+      if(!m.has(ch))m.set(ch,new Set());
+      m.get(ch).add(w);
+    }
+    positions.push(m);
+  }
+  POS_INDEX.set(len,positions);
+}
+
+function patternCandidates(slot, assignment, neighbors) {
+  let pool=null;
+  const idx=slot.index;
+  for(const [nb,pi,pn] of neighbors[idx]) {
+    if(!assignment.has(nb)) continue;
+    const w=assignment.get(nb);
+    const set=POS_INDEX.get(slot.len)?.[pi]?.get(w[pn]);
+    if(!set)return [];
+    if(pool===null)pool=new Set(set);
+    else pool=new Set([...pool].filter(x=>set.has(x)));
+    if(!pool.size)return [];
+  }
+  return pool ? [...pool] : (WORDS_BY_LEN.get(slot.len)||[]).slice();
+}
+
+function buildNeighborGraph(slots){
+  const map=new Map();
+  slots.forEach((s,i)=>s.index=i);
+  slots.forEach((s,i)=>s.cells.forEach((cell,p)=>{
+    const key=cell[0]+','+cell[1];
+    if(!map.has(key))map.set(key,[]);
+    map.get(key).push([i,p]);
+  }));
+  const n=slots.map(()=>[]);
+  for(const items of map.values()){
+    if(items.length===2){
+      const [[a,pa],[b,pb]]=items;
+      n[a].push([b,pa,pb]); n[b].push([a,pb,pa]);
+    }
+  }
+  return n;
+}
+
+function mutateSeed(seed){
+  const {slots}=makeGrid(MASKS[seed.mask],seed.words);
+  const neighbors=buildNeighborGraph(slots);
+  const original=new Map(seed.words.map((w,i)=>[i,w]));
+
+  for(let attempt=0;attempt<24;attempt++){
+    const forced=new Set();
+    seed.words.forEach((w,i)=>{if(FORBIDDEN_WORDS.has(w))forced.add(i);});
+    const count=8+rnd(7);
+    const available=shuffle(Array.from({length:slots.length},(_,i)=>i).filter(i=>!forced.has(i)));
+    for(let i=0;i<Math.min(count,available.length);i++)forced.add(available[i]);
+
+    const assignment=new Map();
+    for(let i=0;i<slots.length;i++)if(!forced.has(i))assignment.set(i,seed.words[i]);
+    let nodes=0;
+
+    function solve(){
+      nodes++; if(nodes>5000)return null;
+      if(assignment.size===slots.length)return new Map(assignment);
+      let best=-1,bestPool=null;
+      for(let i=0;i<slots.length;i++){
+        if(assignment.has(i))continue;
+        const pool=patternCandidates(slots[i],assignment,neighbors)
+          .filter(w=>!FORBIDDEN_WORDS.has(w) && (SESSION_WORD_USE.get(w)||0)<50);
+        if(!pool.length)return null;
+        if(bestPool===null || pool.length<bestPool.length){best=i;bestPool=pool;}
+        if(bestPool.length<=1)break;
+      }
+      const currentLetters=new Set([...assignment.values()].join(''));
+      const missingRare=['j','q','x','z'].filter(x=>!currentLetters.has(x));
+      const ranked=bestPool.map(w=>{
+        let score=Math.random()*18;
+        if(w===original.get(best))score-=80;
+        for(const ch of new Set(w))if(missingRare.includes(ch))score+=20;
+        score-=Math.min(20,(SESSION_WORD_USE.get(w)||0)*2);
+        return [score,w];
+      }).sort((a,b)=>b[0]-a[0]).slice(0,70);
+      for(const [,w] of ranked){
+        assignment.set(best,w);
+        const result=solve();
+        if(result)return result;
+        assignment.delete(best);
+      }
+      return null;
+    }
+
+    const result=solve();
+    if(!result)continue;
+    const words=result.size===slots.length?slots.map((_,i)=>result.get(i)):null;
+    if(!words)continue;
+    const {g}=makeGrid(MASKS[seed.mask],words);
+    if(!validPuzzle(g))continue;
+    const sig=seed.mask+'|'+words.join(',');
+    if(recent.has(sig))continue;
+    if(words.some(w=>FORBIDDEN_WORDS.has(w)))continue;
+    return {mask:MASKS[seed.mask],words,g,slots,sig};
+  }
+  return null;
+}
+
+function choosePuzzle(){
+  const seeds=shuffle(BANK);
+  // Prefer mutation; fall back to a valid seed if the browser cannot find a
+  // fresh mutation quickly. The seed itself is still subject to the diversity
+  // blacklist, so Azure/Mexican can never return as playable words.
+  for(const b of seeds){
+    const mutated=mutateSeed(b);
+    if(mutated)return mutated;
+  }
+  for(const b of seeds){
+    if(b.words.some(w=>FORBIDDEN_WORDS.has(w)))continue;
+    const x=makeGrid(MASKS[b.mask],b.words);
+    if(validPuzzle(x.g))return {mask:MASKS[b.mask],words:b.words,g:x.g,slots:x.slots,sig:b.mask+'|'+b.words.join(',')};
+  }
+  throw new Error('Unable to create a fresh puzzle. Please press New Puzzle again.');
+}
+
 
 function renderControl(){
   controlEl.innerHTML='';
@@ -94,7 +219,19 @@ function renderHints(){
   hintsEl.innerHTML='<span>Starting clues:</span>';
   puzzle.hints.forEach(h=>{const x=document.createElement('span');x.className='hint-pill';x.textContent=`${h.code} = ${h.letter.toUpperCase()}`;hintsEl.appendChild(x)});
 }
-function renderAll(){renderGrid();renderControl();renderHints();}
+function renderAlphabet(){
+  const el=document.getElementById('alphabet');
+  el.innerHTML='';
+  const used=new Set(puzzle.hints.map(h=>h.letter.toLowerCase()));
+  for(const letter of Object.values(userMap)) used.add(letter.toLowerCase());
+  for(const letter of ALPHABET){
+    const x=document.createElement('span');
+    x.className='alphabet-letter'+(used.has(letter)?' used':'');
+    x.textContent=letter.toUpperCase();
+    el.appendChild(x);
+  }
+}
+function renderAll(){renderGrid();renderControl();renderHints();renderAlphabet();}
 
 function selectCode(code){
   selectedCode=code;selectedCodeEl.textContent=code;
@@ -103,6 +240,20 @@ function selectCode(code){
   decoderMsg.textContent='';
   renderGrid();renderControl();letterInput.focus();
 }
+function isPuzzleSolved(){
+  for(let n=1;n<=26;n++){
+    const hint=puzzle.hints.find(h=>h.code===n);
+    const answer=hint?hint.letter:userMap[n];
+    if((answer||'').toLowerCase()!==puzzle.n2l[n].toLowerCase()) return false;
+  }
+  return true;
+}
+function showCongratulations(){
+  document.getElementById('successMessage').classList.remove('hidden');
+}
+function hideCongratulations(){
+  document.getElementById('successMessage').classList.add('hidden');
+}
 function setLetter(){
   if(selectedCode==null){decoderMsg.textContent='Select a numbered square first.';return}
   const ch=letterInput.value.trim().toLowerCase();
@@ -110,7 +261,7 @@ function setLetter(){
   const hint=puzzle.hints.find(h=>h.code===selectedCode);
   if(hint&&hint.letter!==ch){decoderMsg.textContent='That number is a supplied clue.';return}
   for(const [n,l] of Object.entries(userMap))if(Number(n)!==selectedCode&&l===ch){decoderMsg.textContent=`${ch.toUpperCase()} is already assigned to ${n}.`;return}
-  userMap[selectedCode]=ch;decoderMsg.textContent=`${selectedCode} = ${ch.toUpperCase()}`;renderAll();
+  userMap[selectedCode]=ch;decoderMsg.textContent=`${selectedCode} = ${ch.toUpperCase()}`;renderAll();if(isPuzzleSolved())showCongratulations();
 }
 function clearLetter(){
   if(selectedCode==null)return;
@@ -143,8 +294,9 @@ function chooseHintLetters(words){
 }
 
 function newPuzzle(){
-  const start=performance.now();userMap={};selectedCode=null;solutionEl.classList.add('hidden');
+  const start=performance.now();userMap={};selectedCode=null;solutionEl.classList.add('hidden');hideCongratulations();
   const chosen=choosePuzzle();const c=cipher();
+  chosen.words.forEach(w=>SESSION_WORD_USE.set(w,(SESSION_WORD_USE.get(w)||0)+1));
   const letters=chooseHintLetters(chosen.words);
   puzzle={...chosen,...c,hints:letters.map(letter=>({letter,code:c.l2n[letter]}))};
   recent.add(chosen.sig);if(recent.size>100)recent.delete(recent.values().next().value);
@@ -156,6 +308,5 @@ document.getElementById('setLetter').addEventListener('click',setLetter);
 document.getElementById('clearLetter').addEventListener('click',clearLetter);
 letterInput.addEventListener('keydown',e=>{if(e.key==='Enter')setLetter()});
 document.addEventListener('keydown',e=>{if(selectedCode!=null&&/^[a-zA-Z]$/.test(e.key)){letterInput.value=e.key;setLetter()}});
-//document.getElementById('alphabet').textContent=ALPHABET.toUpperCase().split('').join('  ');
 newPuzzle();
 })();

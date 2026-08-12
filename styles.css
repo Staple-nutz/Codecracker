@@ -26,7 +26,11 @@ button.light{background:#f3f4f5}
 .cell .code{position:absolute;left:3px;top:2px;font-size:clamp(7px,1.15vw,13px);line-height:1;color:#30363b}
 .cell .letter{font-family:Georgia,serif;font-weight:bold;font-size:clamp(16px,2.55vw,30px);margin-top:5px}
 .cell.unsolved .letter{color:transparent}
-.alphabet{display:flex;justify-content:space-between;font-family:Georgia,serif;font-weight:bold;font-size:clamp(10px,1.7vw,17px);padding:5px 1px 0}
+.alphabet{display:grid;grid-template-columns:repeat(26,minmax(0,1fr));gap:1px;font-family:Georgia,serif;font-weight:bold;font-size:clamp(10px,1.7vw,17px);padding:5px 1px 0;user-select:none}
+.alphabet-letter{text-align:center;padding:2px 0;color:#15191e;line-height:1.1}
+.alphabet-letter.used{color:#9ba3aa;text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:#59636c}
+.success-message{margin:8px auto 0;padding:9px 12px;text-align:center;border:1px solid #8fbd8f;background:#e9f7e9;color:#285228;border-radius:4px;font-size:13px}
+.success-message strong{font-size:15px;margin-right:5px}
 .control-area{width:108px;min-width:108px;border-left:1px solid #aaa;padding-left:8px}
 .control-title{font-size:10px;font-weight:bold;color:#626b73;text-align:center;margin-bottom:3px}
 .control-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid #aeb5ba}

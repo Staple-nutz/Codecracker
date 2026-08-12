@@ -14,7 +14,7 @@
       <div class="subtitle">Simon Shuker-style Code Cracker plagiarized by Staplez</div>
       <h1>C***-Cracker</h1>
     </div>
-    <div class="puzzle-number">V3.4</div>
+    <div class="puzzle-number">V4.0</div>
   </div>
   <p>Each number represents a different letter of the alphabet. Select a number in the grid then enter your letter suggestion in the Enter letter section below the puzzle. The Solve button is for soft c***s and the New Puzzle button creates a new f***en puzzle.</p>
 </header>
@@ -35,7 +35,8 @@
     <div class="puzzle-and-control">
       <div class="main-area">
         <div id="grid" class="grid" aria-label="13 by 13 puzzle grid"></div>
-        <div class="alphabet" id="alphabet"></div>
+        <div class="alphabet" id="alphabet" aria-label="Letters already used in the puzzle"></div>
+        <div id="successMessage" class="success-message hidden" role="status" aria-live="polite"><strong>Congratulations!</strong> You solved the puzzle.</div>
       </div>
 
       <aside class="control-area">
@@ -65,7 +66,9 @@
   </section>
 </main>
 
-<footer>write some shit in here</footer>
+<footer><p>The puzzle system now uses the 3,001 valid layouts as seeds.</p>
+<p>Each New Puzzle attempt mutates a seed using the cleaned English word dictionary, while preserving the 13x13 layout, real-word crossings and 26-letter coverage.</p>
+<p>The generator tracks word usage during the current session and strongly favours words that have not been used recently.</p></footer>
 
 <script src="words.js"></script>
 <script src="puzzles.js"></script>
